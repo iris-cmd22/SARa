@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pdf
+.venv/
+*.egg-info/
+
+# Copie temporanee degli script di esperimento (canonici in sara-project/
+# root, non fanno parte dell'agente) e loro output - possono contenere path
+# locali nei nomi file/nell'output.
+_run_battery_experiment.py
+_run_signal_loss_experiment.py
+experiment_results/
+run_battery_experiment_log_*.txt
+run_signal_loss_experiment_log_*.txt
