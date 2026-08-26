@@ -25,6 +25,31 @@ from agent.planning_bridge.plan import Plan
 # assume SAREnv clonata come sibling di questo repo, com'è documentato nel
 # README.
 DATA_DIR = os.environ.get("SARENV_DATASET_DIR", "../SAREnv/sarenv_dataset/19")
+
+STARTUP_BANNER = r"""
+                  /\
+         /**\
+        /****\   /\
+       /      \ /**\
+      /  /\    /    \        /\    /\  /\      /\            /\/\/\  /\
+     /  /  \  /      \      /  \/\/  \/  \  /\/  \/\  /\  /\/ / /  \/  \
+    /  /    \/ /\     \    /    \ \  /    \/ /   /  \/  \/  \  /    \   \
+   /  /      \/  \/\   \  /      \    /   /    \
+__/__/_______/___/__\___\__________________________________________________
+
+  :####:     :##:    ######:     :##:
+ :######      ##     #######      ##
+ ##:  :#     ####    ##   :##    ####
+ ##          ####    ##    ##    ####
+ ###:       :#  #:   ##   :##   :#  #:
+ :#####:     #::#    #######:    #::#
+  .#####:   ##  ##   ######     ##  ##
+     :###   ######   ##   ##.   ######
+       ##  .######.  ##   ##   .######.
+ #:.  :##  :##  ##:  ##   :##  :##  ##:
+ #######:  ###  ###  ##    ##: ###  ###
+ .#####:   ##:  :##  ##    ### ##:  :##
+"""
 SEARCH_SPEED_MPS = 8.0
 SAFETY_MARGIN_M = 500
 TICK_SECONDS = 300
@@ -72,6 +97,7 @@ def run_mission(data_dir=DATA_DIR, battery_start_soc=1.0, output_prefix="mission
     Returns:
         dict con le metriche finali della missione.
     """
+    print(STARTUP_BANNER)
     item, center_proj, victims_gdf, meters_per_bin = load_environment(data_dir)
     ipp_point = center_proj
 

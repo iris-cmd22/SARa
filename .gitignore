@@ -12,3 +12,5 @@ _run_signal_loss_experiment.py
 experiment_results/
 run_battery_experiment_log_*.txt
 run_signal_loss_experiment_log_*.txt
+_run_battery_experiment_log_*.txt
+_run_signal_loss_experiment_log_*.txt

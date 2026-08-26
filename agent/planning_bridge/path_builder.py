@@ -20,16 +20,25 @@ ALGORITHMS = {
 # probabilità, non ne fa parte.
 EXHAUSTIVE_ALGORITHMS = {"spiral", "concentric_circles", "pizza_zigzag"}
 
-# Retta ancorata ai due estremi osservati nell'esperimento a 36 run (4 livelli
-# x 3 batterie x 3 ripetizioni): temperate_flat (radius_km=0.6, SAREnv size
-# "small") già copriva quasi il 100% con l'altitudine di default, quindi resta
-# invariata lì; dry_mountainous (radius_km=1.6) era il caso peggiore (13-32%
-# di copertura), a cui è ancorato il tetto massimo. Valori di RADIUS_* per
-# size "small" da sarenv/utils/lost_person_behavior.py.
+# Retta ancorata a due estremi osservati - ma NON più agli stessi due della
+# prima versione. Primo esperimento a 36 run (4 livelli x 3 batterie x 3
+# ripetizioni): temperate_flat (radius_km=0.6) già ~100% di copertura col
+# default, invariato. Con la versione iniziale della retta (tetto raggiunto
+# solo a radius_km=1.6, dry_mountainous), temperate_mountainous (radius_km=
+# 1.1, altitudine risultante 120m) è rimasto il livello peggiore in assoluto
+# nel secondo esperimento - media 33.6% di dispersi trovati su 3 batterie,
+# PEGGIORE di dry_mountainous (73.7% medio) nonostante una ROI più piccola
+# (area minore da coprire) - mentre dry_mountainous con l'altitudine piena
+# (160m) performava bene. Prova che 120m a 1.1km non bastava quanto 160m
+# bastava a 1.6km: il tetto va raggiunto prima. Retaratura: il tetto massimo
+# si raggiunge già a radius_km=1.1 (non più 1.6) - dry_flat (radius_km=1.3)
+# ne beneficia di conseguenza (resta comunque sotto il tetto prima, ora lo
+# tocca anche lui, coerente con la sua debolezza osservata a batteria bassa).
+# Valori di RADIUS_* per size "small" da sarenv/utils/lost_person_behavior.py.
 ALTITUDE_BASE_M = 80.0
 ALTITUDE_MAX_M = 160.0
 RADIUS_BASELINE_KM = 0.6  # temperate_flat - qui il default basta già
-RADIUS_WORST_CASE_KM = 1.6  # dry_mountainous - qui serve il tetto massimo
+RADIUS_WORST_CASE_KM = 1.1  # temperate_mountainous - qui serve già il tetto massimo
 
 
 def altitude_for_radius(radius_km: float) -> float:
