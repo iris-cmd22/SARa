@@ -138,7 +138,7 @@ def extract_json_object(text: str) -> dict:
     raise ValueError("Nessun oggetto JSON bilanciato trovato nell'output del modello")
 
 
-def _query_llm(prompt: str, grammar: str, n_predict: int = 100, timeout_s: int = 60) -> dict:
+def _query_llm(prompt: str, grammar: str, n_predict: int = 100, timeout_s: int = 400) -> dict:
     """Interroga llama-server (processo persistente, modello già in RAM), con
     la grammatica GBNF passata come parametro esteso (non json_schema, per
     evitare il bug noto di llama.cpp su json_schema+chatml)."""

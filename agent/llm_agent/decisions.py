@@ -42,7 +42,12 @@ def decide_algorithm(plan, item, center_proj, victims_gdf, meters_per_bin, flown
                       environment_summary, rul_json):
     """Copertura/probabilità osservate (sulla traiettoria persistente, non sul
     solo path di questo tick) decidono la fase; l'LLM sceglie poi l'algoritmo
-    migliore tra i soli candidati di quella fase."""
+    migliore tra i soli candidati di quella fase.
+
+    Returns:
+        (coverage_fraction, likelihood_fraction): usati dal chiamante per
+        decidere se la ricerca è di fatto completa (vedi mission_loop.py).
+    """
     evaluator = PathEvaluator(item.heatmap, item.bounds, victims_gdf, plan.fov_deg, plan.altitude_m, meters_per_bin)
     coverage_metrics = evaluator.calculate_all_metrics(flown_segments, discount_factor=0.999)
     total_roi_area_km2 = pi * (item.radius_km ** 2)
@@ -73,3 +78,5 @@ def decide_algorithm(plan, item, center_proj, victims_gdf, meters_per_bin, flown
         print(f"Plan aggiornato: {plan}")
     except Exception as e:
         print(f"Errore nella decisione sull'algoritmo (proseguo con il piano invariato): {e}")
+
+    return coverage_fraction, likelihood_fraction
