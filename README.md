@@ -170,7 +170,7 @@ Le linee blu (più scure = tick più recenti) sono il percorso realmente volato,
 
 La numerazione degli assi (`478750`...`480750`, `5.04850e6`...) sono coordinate proiettate (metri), non lat/lon - scala reale della ROI (qui un cerchio di poco più di 2km di diametro).
 
-## Script di supporto per run strumentate (fuori da questo repo)
+## Script di supporto per run strumentate
 
 Vivono in `sara-project/` (la cartella che contiene questo repo come sottocartella `refactor/`), non versionati qui - servono per raccogliere metriche a runtime, non fanno parte della logica dell'agente:
 
