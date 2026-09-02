@@ -39,10 +39,19 @@ def decide_safety(plan, rul_json):
 
 
 def decide_algorithm(plan, item, center_proj, victims_gdf, meters_per_bin, flown_segments,
-                      environment_summary, rul_json):
+                      environment_summary, rul_json, skip_llm=False):
     """Copertura/probabilità osservate (sulla traiettoria persistente, non sul
     solo path di questo tick) decidono la fase; l'LLM sceglie poi l'algoritmo
     migliore tra i soli candidati di quella fase.
+
+    Args:
+        skip_llm: se True, calcola solo copertura/probabilità (pura
+            geometria via PathEvaluator, nessun LLM) e le ritorna subito -
+            usato dalla baseline non adattiva (fixed_algorithm in
+            mission_loop.py) cosi' lo stop anticipato su copertura/probabilità
+            resta identico tra le due condizioni, e il confronto isola solo
+            l'effetto della selezione algoritmica via LLM, non anche la
+            capacità di riconoscere che la ricerca è completa.
 
     Returns:
         (coverage_fraction, likelihood_fraction): usati dal chiamante per
@@ -59,6 +68,9 @@ def decide_algorithm(plan, item, center_proj, victims_gdf, meters_per_bin, flown
         if total_heatmap_probability > 0 else 0
     )
     print(f"Copertura area finora: {coverage_fraction:.1%}  |  probabilità osservata: {likelihood_fraction:.1%}")
+
+    if skip_llm:
+        return coverage_fraction, likelihood_fraction
 
     exhaustive_phase = (
         coverage_fraction >= COVERAGE_PHASE_THRESHOLD or likelihood_fraction >= LIKELIHOOD_PHASE_THRESHOLD
