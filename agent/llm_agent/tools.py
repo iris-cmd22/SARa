@@ -11,8 +11,7 @@ def set_search_algorithm(plan: Plan, algorithm: str) -> None:
 
 
 def set_budget(plan: Plan, latest_rul: dict, budget_m: float) -> None:
-    """Tool: l'LLM sceglie solo `budget_m`; validato contro il range residuo
-    sicuro prima di applicarlo, mai fidato ciecamente."""
+    """Tool: l'LLM sceglie solo `budget_m`; validato contro il range residuo."""
     derived = latest_rul["derived"]
     max_safe_budget = derived["remaining_range_m"] - derived["distance_to_ipp_m"] - derived["safety_margin_m"]
     if budget_m > max_safe_budget:

@@ -1,7 +1,9 @@
 import os
+import random
 from math import pi
 
 import geopandas as gpd
+import numpy as np
 from sarenv.analytics.evaluator import ComparativeEvaluator
 from sarenv.analytics.metrics import PathEvaluator
 from sarenv.core.lost_person import LostPersonLocationGenerator
@@ -54,8 +56,11 @@ SEARCH_SPEED_MPS = 8.0
 SAFETY_MARGIN_M = 500
 TICK_SECONDS = 300
 # Abbastanza alto da non tagliare la missione mentre copertura/RUL sono
-# ancora sani (verificato empiricamente).
-MAX_MISSION_SECONDS = 20000
+# ancora sani (verificato empiricamente). Sovrascrivibile via env var per
+# esperimenti che devono restare corti apposta (es. sweep di resilienza) -
+# default invariato, non tocca il guardrail stesso (n_runs/orizzonte Monte
+# Carlo restano quelli di sempre, converge solo più in fretta con RUL basso).
+MAX_MISSION_SECONDS = int(os.environ.get("MAX_MISSION_SECONDS", 20000))
 # Se la ricerca ha di fatto già coperto l'area/i dispersi (soglie alte
 # apposta, per non tagliare corto durante la fase normale di ricerca),
 # l'agente continuerebbe comunque a rivalutare la stessa situazione senza
@@ -95,11 +100,23 @@ def load_environment(data_dir=DATA_DIR):
     return item, center_proj, victims_gdf, meters_per_bin
 
 
-def run_mission(data_dir=DATA_DIR, battery_start_soc=1.0, output_prefix="mission", signal_loss=False, fixed_algorithm=None):
+def run_mission(data_dir=DATA_DIR, battery_start_soc=1.0, output_prefix="mission", signal_loss=False, fixed_algorithm=None, seed=None):
     """Args:
         data_dir: cartella del dataset SAREnv (es. .../sarenv_dataset/19).
         battery_start_soc: stato di carica iniziale, 0-1 (default 1.0 = piena).
         output_prefix: prefisso dei due PDF salvati a fine missione.
+        seed: se impostato, fissa random.seed()/np.random.seed() prima di
+            generare l'ambiente - controlla sia il posizionamento dei dispersi
+            (LostPersonLocationGenerator in SAREnv, usa random.uniform/choices
+            e .sample() di pandas, quindi random+np.random legacy) sia il
+            rumore di processo della batteria (ProgPy, np.random.normal/
+            uniform in noise_functions.py - anch'esso stato globale legacy,
+            non default_rng()). Non tocca il path di greedy, già fissato a
+            parte con un seed indipendente in greedy_seed.py (default_rng,
+            API diversa). Default None: nessun seeding, comportamento
+            invariato rispetto a prima - necessario per confrontare più
+            modelli/algoritmi sullo stesso scenario (stesso seed = stessi
+            dispersi e stesso rumore batteria per ogni run con quel seed).
         signal_loss: se False (default), signal_connected resta puramente
             narrativo/informativo come prima - nessun effetto sulle decisioni.
             Se True, quando il segnale è connesso l'LLM non viene interpellato
@@ -118,6 +135,10 @@ def run_mission(data_dir=DATA_DIR, battery_start_soc=1.0, output_prefix="mission
     Returns:
         dict con le metriche finali della missione.
     """
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+
     print(STARTUP_BANNER)
     item, center_proj, victims_gdf, meters_per_bin = load_environment(data_dir)
     ipp_point = center_proj
@@ -142,6 +163,7 @@ def run_mission(data_dir=DATA_DIR, battery_start_soc=1.0, output_prefix="mission
         plan=plan,
         searching_currents_by_algorithm=DEFAULT_SEARCHING_CURRENTS_BY_ALGORITHM,
         returning_current=1.7,
+        battery_model=model,
     )
     battery_state = initial_battery_state(model, battery_start_soc)
     t = 0
@@ -226,6 +248,7 @@ def run_mission(data_dir=DATA_DIR, battery_start_soc=1.0, output_prefix="mission
         f"Dispersi trovati: {victim_metrics['percentage_found']:.1f}% "
         f"({len(victim_metrics['found_victim_indices'])} su {len(victims_gdf)})"
     )
+    print(f"Copertura finale: {final_coverage_fraction:.1%}")
 
     save_trajectory_plot(item, trajectory_segments, f"{output_prefix}_trajectory.pdf")
     save_victims_plot(item, victims_gdf, victim_metrics, trajectory_segments, ipp_point, f"{output_prefix}_victims_map.pdf")
@@ -244,4 +267,8 @@ def run_mission(data_dir=DATA_DIR, battery_start_soc=1.0, output_prefix="mission
 
 
 if __name__ == "__main__":
-    run_mission()
+    _seed = os.environ.get("MISSION_SEED")
+    run_mission(
+        battery_start_soc=float(os.environ.get("BATTERY_START_SOC", 1.0)),
+        seed=int(_seed) if _seed is not None else None,
+    )

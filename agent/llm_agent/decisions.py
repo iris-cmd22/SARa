@@ -14,13 +14,34 @@ from agent.planning_bridge.path_builder import EXHAUSTIVE_ALGORITHMS, algorithm_
 COVERAGE_PHASE_THRESHOLD = 0.5
 LIKELIHOOD_PHASE_THRESHOLD = 0.7
 
+# Sotto questa soglia il rapporto picco/media della probabilità è troppo
+# basso: "greedy" insegue il gradiente locale, ma su una superficie quasi
+# piatta non ha nulla da inseguire e converge a caso. Validato su probe
+# reali: env42 (picco/media=1.07) -> greedy 0% dispersi trovati; env3 (1.92)
+# -> 97%; env16 (2.93) -> 89%. Soglia 1.5 scelta a metà tra il fallimento
+# osservato e il primo successo osservato.
+GREEDY_MIN_PEAK_TO_MEAN = 1.5
+
+
+def _heatmap_peak_to_mean(heatmap):
+    """Rapporto picco/media sulle sole celle a probabilità positiva: misura
+    quanto la distribuzione sia "piatta" (vicino a 1) o "piccata" (alto).
+    Usato per escludere "greedy" dalla grammatica quando l'ambiente non offre
+    un gradiente utile da seguire (vedi GREEDY_MIN_PEAK_TO_MEAN)."""
+    positive = heatmap[heatmap > 0]
+    if positive.size == 0:
+        return 0.0
+    mean = positive.mean()
+    return float(positive.max() / mean) if mean > 0 else 0.0
+
 
 def print_tick_status(t, rul_json, plan, signal_connected):
     print(
         f"\n[t={t}s] RUL={rul_json['battery']['rul_s']:.0f}s  "
         f"dist_ipp={rul_json['derived']['distance_to_ipp_m']:.0f}m  "
         f"rtb_required={rul_json['derived']['rtb_required']}  status={plan.status}  "
-        f"segnale={'connesso' if signal_connected else 'PERSO'}"
+        f"segnale={'connesso' if signal_connected else 'PERSO'}  "
+        f"predicted_power_mw={rul_json['battery']['predicted_power_w'] * 1000:.0f}"
     )
 
 
@@ -75,8 +96,18 @@ def decide_algorithm(plan, item, center_proj, victims_gdf, meters_per_bin, flown
     exhaustive_phase = (
         coverage_fraction >= COVERAGE_PHASE_THRESHOLD or likelihood_fraction >= LIKELIHOOD_PHASE_THRESHOLD
     )
-    candidate_algorithms = EXHAUSTIVE_ALGORITHMS if exhaustive_phase else None
-    print(f"Fase: {'copertura esaustiva' if exhaustive_phase else 'ricerca rapida (tutti gli algoritmi)'}")
+    greedy_viable = _heatmap_peak_to_mean(item.heatmap) >= GREEDY_MIN_PEAK_TO_MEAN
+
+    if exhaustive_phase:
+        candidate_algorithms = EXHAUSTIVE_ALGORITHMS
+        phase_msg = "copertura esaustiva"
+    elif not greedy_viable:
+        candidate_algorithms = EXHAUSTIVE_ALGORITHMS
+        phase_msg = "ricerca rapida (greedy escluso dalla grammatica: probabilità troppo piatta)"
+    else:
+        candidate_algorithms = None
+        phase_msg = "ricerca rapida (tutti gli algoritmi)"
+    print(f"Fase: {phase_msg}")
 
     efficiency_summary = algorithm_efficiency_summary(
         plan, center_proj.x, center_proj.y, item.radius_km * 1000, item.heatmap, item.bounds,

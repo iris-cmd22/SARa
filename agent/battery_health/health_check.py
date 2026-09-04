@@ -14,25 +14,55 @@ DEFAULT_SEARCHING_CURRENTS_BY_ALGORITHM = {
     "greedy": 3.6,
 }
 
+# Potenza media del calcolo di bordo (LLM + guardrail su Jetson Orin),
+# misurata da tegrastats su 2 ambienti/6 run reali (analysis/data/pooled_tegrastats.csv,
+# report Sezione RQ5 - Risorse ed energia): 8.56W (env6) / 8.58W (env44), media
+# pooled 8.57W. Richiesta esplicita del relatore: il modello di batteria deve
+# scaricarsi anche per il consumo energetico del calcolo IA di bordo, non solo
+# per il movimento del drone (DEFAULT_SEARCHING_CURRENTS_BY_ALGORITHM sopra) -
+# prima di questa modifica il calcolo era invisibile al bilancio energetico
+# simulato. Costante, non letta live da tegrastats: il modello gira anche su
+# QEMU (nessun tegrastats disponibile) e comunque la potenza di calcolo non
+# dipende in modo osservabile dall'ambiente SAR (stesso modello, stesso
+# hardware, Sezione RQ3 - throughput sostanzialmente identico tra env6/env44).
+DEFAULT_COMPUTE_POWER_W = 8.57
+
 
 @dataclass
 class MissionLoadProfile:
     """Profilo di carico per ProgPy: callable (t, x=None) che
-    simulate_to_threshold usa come future_loading_eqn. La corrente dipende
-    dallo status del Plan condiviso (searching/returning) e, in ricerca,
-    dall'algoritmo scelto - mai da un calcolo derivato dal tempo."""
+    simulate_to_threshold usa come future_loading_eqn. La corrente totale è
+    la somma di due contributi indipendenti: il movimento (dipende dallo
+    status del Plan condiviso - searching/returning - e, in ricerca,
+    dall'algoritmo scelto, mai da un calcolo derivato dal tempo) e il calcolo
+    di bordo (potenza costante misurata, convertita in corrente tramite la
+    tensione istantanea della batteria)."""
 
     plan: Plan
     searching_currents_by_algorithm: dict
     returning_current: float
+    battery_model: object
+    compute_power_w: float = DEFAULT_COMPUTE_POWER_W
 
     def phase_at(self, t: float) -> str:
         return "returning" if self.plan.status == "RETURN_TO_BASE" else "searching"
 
-    def __call__(self, t, x=None):
+    def _movement_current(self, t: float) -> float:
         if self.phase_at(t) == "returning":
-            return {"i": self.returning_current}
-        return {"i": self.searching_currents_by_algorithm[self.plan.algorithm]}
+            return self.returning_current
+        return self.searching_currents_by_algorithm[self.plan.algorithm]
+
+    def _compute_current(self, x) -> float:
+        # ProgPy chiama future_loading_eqn(t) senza x al primissimo passo
+        # (prima che lo stato sia inizializzato): in quel caso usiamo lo
+        # stato iniziale x0 dei parametri del modello, che a quell'istante
+        # coincide esattamente con lo stato vero della batteria.
+        state = x if x is not None else self.battery_model.parameters["x0"]
+        voltage_v = self.battery_model.output(state)["v"]
+        return self.compute_power_w / voltage_v
+
+    def __call__(self, t, x=None):
+        return {"i": self._movement_current(t) + self._compute_current(x)}
 
 
 def distance_to_ipp(path, ipp_point, distance_traveled_m: float) -> float:
@@ -112,6 +142,17 @@ def health_check(plan, path, ipp_point, battery_state, battery_model, load_profi
     voltage_v = battery_model.output(battery_state)["v"]
     soc = state_of_charge(battery_model, battery_state)
 
+    # Potenza prevista dal modello di batteria allo stato ATTUALE (non una
+    # nuova simulazione Monte Carlo: load_profile(t, x) e' la stessa funzione
+    # che ProgPy chiama internamente ad ogni passo di simulazione, qui
+    # applicata una volta sola allo stato vero) - corrente totale (movimento +
+    # calcolo di bordo) per la tensione istantanea. Confrontabile direttamente
+    # con tegrastats.log (mW) per rispondere alla domanda aperta col relatore:
+    # il modello di batteria e' un proxy sufficiente per l'energia, o serve
+    # tegrastats come fonte autorevole? (vedi analysis/plot_predicted_vs_real_power.py)
+    predicted_current_a = load_profile(t, battery_state)["i"]
+    predicted_power_w = predicted_current_a * voltage_v
+
     distance_to_ipp_m = distance_to_ipp(path, ipp_point, distance_traveled_m)
     remaining_range_m = rul_s * search_speed_mps
 
@@ -126,6 +167,7 @@ def health_check(plan, path, ipp_point, battery_state, battery_model, load_profi
             "voltage_v": voltage_v,
             "rul_s": rul_s,
             "rul_distribution": rul_dist,
+            "predicted_power_w": predicted_power_w,
         },
         "derived": {
             "remaining_range_m": remaining_range_m,

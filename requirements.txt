@@ -1,9 +1,9 @@
 # Dipendenze dirette dell'agente (versioni verificate durante lo sviluppo).
 # SAREnv NON e' qui: e' una dipendenza esterna da clonare a parte e installare
 # separatamente (vedi README) - non e' su PyPI in questa forma.
-numpy==2.5.1
+numpy==2.2.6
 geopandas==1.1.4
 shapely==2.1.2
 requests==2.34.2
 progpy==1.7.1
-matplotlib==3.11.1
+matplotlib==3.10.9
